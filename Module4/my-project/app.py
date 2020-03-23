@@ -2,7 +2,7 @@
 """
 Created on Sun Mar 22 22:47:35 2020
 
-@author: aisha
+@author: Mohamed Thasleem , Kalikul Zaman
 """
 import dash
 import dash_core_components as dcc

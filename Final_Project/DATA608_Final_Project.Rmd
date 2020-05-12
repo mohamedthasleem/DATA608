@@ -1,0 +1,316 @@
+---
+title: |
+    | DATA608 Final Project 
+    | Knowledge and Visual Analytics
+author: "Mohamed Thasleem Kalikul Zaman"
+date: "May 13, 2020"
+output: 
+  html_document:
+    df_print: paged
+    theme: united
+    highlight: tango
+    toc: true
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+    code_folding: hide
+---
+
+## Earthquake Analysis
+<li>To Study the behavior of earthquake around the world (year 2000 - 2020) and perform statistical and exploratory analysis based on data from http://earthquake.usgs.gov</li>
+<li>Different factors will be analyzed</li>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1.	What geographical regions have the most magnitude of earthquakes?<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;2.	Earthquake timeline analysis?<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;3.	Trend Analysis of earthquake bases on month/zone<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;4.	Countries most affected by earthquake<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;5.	Other Events causing quakes<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;6.	Exploring the earthquake using shiny app<br>
+
+## Data Sources
+
+<li>Earthquake data obtained from United States Geological Survey using API services</li>
+<li>API - The primary data will be obtained from http://earthquake.usgs.gov using webservice API (https://earthquake.usgs.gov/fdsnws/event/1/query?<PARAMETERS>)</li>
+<li>CSV - Some of the supporting data files are fetched from github</li>
+
+## Approach and libraries
+
+<li>This project follows the data science workflow, the data is first fetched from API and from github location and then it got transformed in order to present in the form the dataframe or graphs</li>
+<li>The following libraries are used</li>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ggmap - map the world<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;RColorBrewer - color coding of graphs<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;tidyverse - data cleansing and transformation<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;knitr - table visvulizations<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ggplot2 - plot graphs<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;GGally - Advanced graphs<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sqldf - SQL operations<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;shiny - to build the shiny app<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;leaflet - generating maps<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;treemap - generating treemaps<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;lubridate - date manipulation<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;plotly - generating graphs<br>
+
+```{r lib, message=FALSE, warning=FALSE}
+# Load libraries
+library(tidyverse)
+library(ggmap)
+library(RColorBrewer)
+library(knitr)
+library(kableExtra)
+library(ggplot2)
+library(GGally)
+library(sqldf)
+library(shiny)
+library(leaflet)
+library(RCurl)
+library(treemap)
+library(lubridate)
+library(plotly)
+```
+## Analysis
+
+Earthquake data from the year 2000 to 2020 has been used for this analysis
+
+### Data from API
+
+<li>USGS has web serive to pull the data using API (example : https://earthquake.usgs.gov/fdsnws/event/1/query?format=csv&starttime=2018-01-01&endtime=2018-02-20")</li>
+<li>There is an limiatation to fetch 20000 records on each request, Written a code to loop through from year 2000 to 2020 and saved in a single csv file format for faster performance</li>
+<br>
+
+```{r lib0, message=FALSE, warning=FALSE}
+#Getting data from API
+#quake_part1 <- read.csv("https://raw.githubusercontent.com/mohamedthasleem/DATA608/master/Final_Project/final_data_cleaned_part1.csv", sep = ",", stringsAsFactors = F)
+#quake_part2 <- read.csv("https://raw.githubusercontent.com/mohamedthasleem/DATA608/master/Final_Project/final_data_cleaned_part2.csv", sep = ",", stringsAsFactors = F)
+
+#quake <- data.frame(rbind(as.matrix(quake_part1), as.matrix(quake_part2)))
+quake <- read.csv("C:/data/final_data_cleaned.csv", sep = ",", stringsAsFactors = F)
+quake$date <- as.Date(quake$date)
+#summary(quake)
+
+#Preview data
+kable(data.frame(head(quake, n=20))) %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive")) %>%
+  row_spec(0, bold = T, color = "white", background = "#ea7872") %>%
+    scroll_box(width = "100%", height = "300px")
+```
+
+## Geographical Impact {.tabset .tabset-pills}
+
+<li>Magnitude is a number that characterizes the relative size of an earthquake, which is based on measurement of the maximum motion recorded by a seismograph</li>
+<li>A Magnitude of 4.5 or higher is considered as dangerous may cause more damage</li>
+<br>
+
+### All Region
+
+```{r lib12, message=FALSE, warning=FALSE, include=TRUE,fig.width=11, fig.height=7}
+
+# all
+quake0 <- subset(quake, quake$mag > 0)
+
+quake0.sorted <- arrange(quake0, desc(mag))
+quake0.mod <- select(quake0.sorted, latitude, longitude, mag)
+inside <- filter(quake0.mod, between(longitude, -90, 90), between(latitude, -180, 180))
+quake0.mod <- setdiff(quake0.mod, inside)
+
+wmap <- borders("world", colour = "gray50", fill = "gray50")
+
+
+# mag > 0 (All recorded seismic events)
+options(repr.plot.width = 20, repr.plot.height = 18)
+quake0_map <- ggplot() + wmap
+quake0_map <- quake0_map + geom_point(data = quake0.mod, aes(x = as.numeric(longitude), y = as.numeric(latitude),
+    colour = mag)) + ggtitle("quakes with Mag > 0 Seismic Events") +
+    xlab("Longitude") + ylab("Latitude")+
+  theme(plot.title = element_text(hjust = 0.5))
+myPalette <- colorRampPalette(rev(brewer.pal(11, "Spectral")))
+sc2 <- scale_colour_gradientn(colours = myPalette(100), limits = c(0, 8))
+quake0_map + sc2
+```
+
+### Risk Region
+
+```{r lib13, message=FALSE, warning=FALSE,fig.width=11, fig.height=7}
+# 4.5
+quake45 <- subset(quake, quake$mag >= 4.5)
+quake45.sorted <- arrange(quake45, desc(mag))
+quake45.mod <- select(quake45.sorted, latitude, longitude, mag)
+inside <- filter(quake45.mod, between(longitude, -90, 90), between(latitude, -180, 180))
+quake45.mod <- setdiff(quake45.mod, inside)
+
+wmap <- borders("world", colour = "gray50", fill = "gray50")
+
+# mag >= 4.5$ 
+quake45_map <- ggplot() + wmap
+quake45_map <- quake45_map + geom_point(data = quake45.mod, aes(x = as.numeric(longitude),
+    y = as.numeric(latitude), colour = mag)) + ggtitle("quakes with Mag > 4.5 - Risk") +
+    xlab("Longitude") + ylab("Latitude") +
+  theme(plot.title = element_text(hjust = 0.5))
+myPalette <- colorRampPalette(rev(brewer.pal(11, "Spectral")))
+sc1 <- scale_colour_gradientn(colours = myPalette(100), limits = c(4.5, 8))
+quake45_map + sc1
+```
+
+## Timeline Analysis
+
+```{r lib_trend, message=FALSE, warning=FALSE}
+ds <- sqldf("select date,avg(depth) as depth,avg(mag) as magnitude from quake where type = 'earthquake' group by date order by date")
+fig <- plot_ly(ds, x = ~date)
+fig <- fig %>% add_lines(y = ~depth, name = "Depth")
+fig <- fig %>% add_lines(y = ~magnitude, name = "Magnitude")
+fig <- fig %>% layout(autosize = F, width = 800, height = 500, margin = ds)
+fig <- fig %>% layout(legend = list(x = 0, y = 1.0))
+fig <- fig %>% layout(
+    title = "Trend Analysis",
+    xaxis = list(
+      rangeselector = list(
+        buttons = list(
+          list(
+            count = 3,
+            label = "3 mo",
+            step = "month",
+            stepmode = "backward"),
+          list(
+            count = 6,
+            label = "6 mo",
+            step = "month",
+            stepmode = "backward"),
+          list(
+            count = 1,
+            label = "1 yr",
+            step = "year",
+            stepmode = "backward"),
+          list(
+            count = 1,
+            label = "YTD",
+            step = "year",
+            stepmode = "todate"),
+          list(step = "all"))),
+
+      rangeslider = list(type = "date")),
+
+    yaxis = list(title = "Depth & Magnitude"))
+
+fig
+```
+
+
+## Trend Analysis {.tabset .tabset-pills}
+
+### Monthly Trend
+```{r libm1, message=FALSE, warning=FALSE,fig.width=11, fig.height=7}
+quake$tes <- paste0('2020',substr(as.character(quake$date),5,10))
+#head(quake)
+quq1 <- sqldf("select tes as date1,latitude from quake")
+quq1$date1 <- as.Date(quq1$date1)
+#head(quq1)
+quq1 %>%
+  group_by(date1) %>%
+  summarise(count = n())  %>%
+  ggplot() +
+  geom_point(mapping = aes(x = date1, y = count, colour = "red")) +
+  scale_x_date(name = 'Month', date_breaks = '1 month', date_labels = '%b') + labs(title = "Earthquake - Monthly Trend (2000 - 2020)", y= "Number of Earthquake", x = "Month")+ theme(legend.position = "none") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+### Zone Level Trend
+
+```{r libz1, message=FALSE, warning=FALSE,fig.width=11, fig.height=7}
+geo_zone <- function(lat) {
+  
+  levels <- c("tropics", "subtropics", "temperate", "frigid")
+  regions <- factor(x = levels, levels = levels, ordered =T)
+  
+  if (abs(lat) < 23.5) {    result <- regions[1]  }
+  else if (abs(lat) < 35) {    result <- regions[2]  }
+  else if (abs(lat) < 66.5) {    result <- regions[3]  }
+  else {    result <- regions[4]  }
+  return(result)
+}
+
+quq1$zone <-unlist(lapply(quq1$latitude, geo_zone))
+
+zone1 <- quq1 %>% group_by(date1, zone = quq1$zone) %>% summarise(count = n())
+
+ggplot(zone1, aes(x = date1, y = count, color = zone1$zone)) +
+  geom_point() +
+  scale_x_date(name = 'Month', date_breaks = '1 month', date_labels = '%b') + 
+  scale_color_brewer(palette="Set1") + labs(title = "Earthquake - Zone Level Impact (2000 - 2020)", y= "Number of Earthquake", x = "Month",  fill = "zone") +
+  theme(plot.title = element_text(hjust = 0.5)) + theme(legend.title = element_blank()) + theme(legend.position = c(0.9, 0.9))
+
+```
+
+## Region Exposure
+
+Treemap showing how different places are impacted by earthquake magnitude
+
+```{r libtm, message=FALSE, warning=FALSE,fig.width=11, fig.height=7}
+#Getting data from github
+station_mapping <- read.csv("https://raw.githubusercontent.com/mohamedthasleem/DATA608/master/Final_Project/stations.csv", sep = ",", stringsAsFactors = F)
+
+#Transformating data
+quakes1 <- left_join(quake, station_mapping, by = c('locationSource')) %>% rename(lat = latitude) %>% rename(long = longitude) %>% mutate(mag = replace_na(mag, 0)) %>% mutate(stations = replace_na(stations, 0)) 
+
+quakes2 <- subset(quakes1, date > '2019-01-01')
+places <-  sqldf("select place,printf(\"%.2f\",avg(mag)) as avg_mag from quakes2 group by place order by avg(mag)")
+places$avg_mag <- as.numeric(places$avg_mag) 
+
+treemap(dtf = places,
+        index=c("place"),
+        vSize="avg_mag",
+        vColor="avg_mag",
+        palette="Spectral",
+        type="value",
+        border.col=c("grey70", "grey90"),
+        fontsize.title = 18,
+        algorithm="pivotSize",
+        title ="Earthquakes by Places - Magnitude (2019-2020)",
+        title.legend="Magnitude")
+
+```
+
+## Other Analysis
+
+Interesting finds apart from earthquake as part of this analysis<br>
+
+```{r liboa, message=FALSE, warning=FALSE,fig.width=11, fig.height=7}
+quake_all <- quake %>% mutate(type = replace(type, type == 'sonicboom', 'sonic boom')) %>% mutate(type = replace(type, type == 'quarry', 'quarry blast')) %>% mutate(type = replace(type, type == 'Rock Slide', 'rockslide'))
+
+other <- sqldf("select type,printf(\"%.2f\",avg(mag)) as avg_mag,count(type) as count from quake_all where type <> \"earthquake\" and type <> \"other event\" and type <> \"not reported\" and type <> \"buildingcollapse\" group by type order by avg(mag),count(type)");
+other$avg_mag <- as.numeric(other$avg_mag)  
+
+ggplot(data=other, aes(x= reorder(type,avg_mag), y=avg_mag, fill=count)) +  geom_bar(stat="identity", fill = "#63b7af") + coord_flip() + geom_text(aes(label=avg_mag), vjust=0.40, colour = "#9a1f40") + ggtitle("Other Events") + theme(plot.title = element_text(hjust = 0.15)) + theme(legend.position = "none") + xlab("Event") + ylab("Magnitude")
+
+```
+
+## Earthquake Explorer
+
+<table>
+  <tr>
+    <td>Shiny link: </td>
+    <td>&nbsp;&nbsp;&nbsp;</td>
+    <td><a href="https://mohamedthasleem.shinyapps.io/DATA608_Final_Project">https://mohamedthasleem.shinyapps.io/DATA608_Final_Project</a></td>
+  </tr>
+</table><br>
+
+### Tectonics Plate
+
+Tectonic earthquakes occur at plate tectonic boundaries. Tectonic plates are constantly moving slowly, but sometimes friction between them causes them lock together and become unable to move. The rest of the plates carry on moving, which leads to increased pressure on the locked section. Eventually, the locked section succumbs to the pressure, and the plates move past each other rapidly. This movement causes a tectonic earthquake. The waves of released energy move through the Earth's crust and cause the shaking we feel at an earthquake site<br>
+Some study says that mountains are the results of tectonic earthquakes<br>
+
+## Challenges
+
+1. The data was taken from API, it has limitation of getting 20000 records at a time, so i have split the records by doing multiple API calls to bind the together
+2. Initially the shiny app was designed to fetch data directly from API, but due to limitation (20000 records), and interactive parameter changes in the shiny app will drastically slowdown the performance, then I have redesigned the shiny app to pull data from R dataframe instead of directly from API
+
+## Conclusion
+
+1. Earthquakes are mostly occurring on temperate regions and high on summer season on tropical regions
+2. Asia is most targeted on earthquake
+3. Climate Change and Tectonics plate movement may change the earthquake behavior
+
+## References
+1.https://earthquake.usgs.gov/fdsnws/event/1/<br>
+2.https://earthquake.usgs.gov/<br>
+3.http://www.lat34north.com/cities/CitiesLatitude.cfm<br>
+4.https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6033417/<br>
+5.https://earthquake.usgs.gov/fdsnws/event/1/#parameters<br>
+6.https://earthquake.usgs.gov/earthquakes/feed/v1.0/csv.php
